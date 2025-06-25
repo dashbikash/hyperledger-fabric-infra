@@ -1,0 +1,175 @@
+---
+Organizations:
+  - &OrdererOrg
+    Name: Orderer
+    ID: OrdererMSP
+    MSPDir: crypto-config/ordererOrganizations/example.com/msp
+
+    Policies:
+      # These are the default policies and should be adequate for most use cases
+      # unless you have specific security requirements that require more granular control.
+      # The 'Readers' policy defines who can read ledger data. It requires signatures
+      # from a majority of orderer nodes.
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      # The 'Writers' policy defines who can submit transactions to the orderer. It also
+      # requires signatures from a majority of orderer nodes.
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      # The 'Admins' policy defines who can perform administrative tasks on the orderer,
+      # such as updating the channel configuration. This typically requires signatures
+      # from a majority of orderer nodes.
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+      # The 'Endorsement' policy defines who can endorse transactions. This is usually
+      # not applicable to orderer organizations as they do not endorse transactions,
+      # but it's included for completeness.
+      Endorsement:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+
+  - &Org1
+    Name: Org1
+    ID: Org1MSP
+    MSPDir: crypto-config/peerOrganizations/org1.example.com/msp
+    # Set the 'NodeOUs' attribute to true to enable Node OUs for this organization.
+    # This allows you to classify identities within the organization based on their role
+    # (e.g., peer, client, admin).
+    NodeOUs:
+      Enable: true
+      ClientOUIdentifier:
+        Certificate: cacerts/ca.org1.example.com-cert.pem
+        OrganizationalUnitIdentifier: client
+      PeerOUIdentifier:
+        Certificate: cacerts/ca.org1.example.com-cert.pem
+        OrganizationalUnitIdentifier: peer
+      AdminOUIdentifier:
+        Certificate: cacerts/ca.org1.example.com-cert.pem
+        OrganizationalUnitIdentifier: admin
+      OrdererOUIdentifier:
+        Certificate: cacerts/ca.org1.example.com-cert.pem
+        OrganizationalUnitIdentifier: orderer
+
+    Policies:
+      # The 'Readers' policy defines who can read ledger data. It requires signatures
+      # from a majority of Org1 members.
+      Readers:
+        Type: Signature
+        Rule: "OR('Org1MSP.admin', 'Org1MSP.peer', 'Org1MSP.client')"
+      # The 'Writers' policy defines who can submit transactions. It requires signatures
+      # from a majority of Org1 members.
+      Writers:
+        Type: Signature
+        Rule: "OR('Org1MSP.admin', 'Org1MSP.client')"
+      # The 'Admins' policy defines who can perform administrative tasks for Org1.
+      # It requires signatures from Org1 administrators.
+      Admins:
+        Type: Signature
+        Rule: "OR('Org1MSP.admin')"
+      # The 'Endorsement' policy defines who can endorse transactions for Org1 peers.
+      # It requires signatures from Org1 peers.
+      Endorsement:
+        Type: Signature
+        Rule: "OR('Org1MSP.peer')"
+
+Capabilities:
+  # The 'V2_0' capability version is recommended for new deployments as it includes
+  # all the latest features and bug fixes.
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_0: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    # These are the default policies for application channels and should be adequate
+    # for most use cases unless you have specific security requirements.
+    Readers:
+      Type: Signature
+      Rule: "OR('OrdererMSP.member')"
+    Writers:
+      Type: Signature
+      Rule: "OR('OrdererMSP.member')"
+    Admins:
+      Type: Signature
+      Rule: "OR('OrdererMSP.admin')"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer.example.com:7050
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.example.com
+        Port: 7050
+        ClientTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+        ServerTLSCert: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+  Organizations:
+  Policies:
+    # These are the default policies for the orderer system channel and should be adequate
+    # for most use cases unless you have specific security requirements.
+    Readers:
+      Type: Signature
+      Rule: "OR('OrdererMSP.member')"
+    Writers:
+      Type: Signature
+      Rule: "OR('OrdererMSP.member')"
+    Admins:
+      Type: Signature
+      Rule: "OR('OrdererMSP.admin')"
+    # The 'BlockValidation' policy defines who can validate new blocks on the orderer.
+    # It requires signatures from a majority of orderer nodes.
+    BlockValidation:
+      Type: Signature
+      Rule: "OR('OrdererMSP.member')"
+
+Channel: &ChannelDefaults
+  Policies:
+    # These are the default policies for all channels and should be adequate for most use cases.
+    Readers:
+      Type: Signature
+      Rule: "OR('OrdererMSP.member')"
+    Writers:
+      Type: Signature
+      Rule: "OR('OrdererMSP.member')"
+    Admins:
+      Type: Signature
+      Rule: "OR('OrdererMSP.admin')"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  OrdererGenesis:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+      Capabilities:
+        <<: *OrdererCapabilities
+    Consortiums:
+      SampleConsortium:
+        Organizations:
+          - *Org1
+  Org1Channel:
+    Consortium: SampleConsortium
+    <<: *ChannelDefaults
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Org1
+      Capabilities:
+        <<: *ApplicationCapabilities
